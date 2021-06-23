@@ -425,21 +425,21 @@ Table}). Уколико је у питању регуларан код, пока
 
 \begin{code}{Пример модула који извози функцију за рачунање факторијела}{cd:MOD}
 (module
-	(func $fact (param $0 i64) (result i64)
+	(func $fact (param $0 i32) (result i32)
 		get_local $0
-		i64.const 0
-		i64.eq
-		(if (result i64)
+		i32.const 0
+		i32.eq
+		(if (result i32)
 			(then
-				i64.const 1
+				i32.const 1
 			)
 			(else
 				get_local $0
 				get_local $0
-				i64.const 1
-				i64.sub
+				i32.const 1
+				i32.sub
 				call $fact
-				i64.mul
+				i32.mul
 			)
 		)
 	)
@@ -465,10 +465,10 @@ Table}). Уколико је у питању регуларан код, пока
 репрезентација може бити у облику апстрактне синтаксе, али и конкретан машински код.
 
 \begin{code}{Хексадекадни запис модула}{cd:HEX}
-00 61 73 6d 01 00 00 00 01 06 01 60 01 7e 01 7e
+00 61 73 6d 01 00 00 00 01 06 01 60 01 7f 01 7f
 03 02 01 00 07 0d 01 09 66 61 63 74 6f 72 69 61
-6c 00 00 0a 19 01 17 00 20 00 42 00 51 04 7e 42
-01 05 20 00 20 00 42 01 7d 10 00 7e 0b 0b 
+6c 00 00 0a 19 01 17 00 20 00 41 00 46 04 7f 41
+01 05 20 00 20 00 41 01 6b 10 00 6c 0b 0b
 \end{code}
 
 \textbf{Валидација} - Декодирани модул мора бити валидан. Ова фаза проверава услове добре дефинисаности како би се
@@ -511,7 +511,7 @@ Table}). Уколико је у питању регуларан код, пока
 (module
 	(func $i (import "imports" "i") (param i32))
 	(func (export "e")
-		i32_const 42
+		i32.const 42
 		call $i))
 \end{code}
 
@@ -524,9 +524,8 @@ function instantiate(bytes, imports) {
 var importObject = 
 	{ imports: { i: arg => console.log(arg) } };
 
-fetch("simple.wasm")
-.then(response => response.arrayBuffer())
-.then(bytes => instantiate(bytes, importObject)
+bytes = readbuffer("simple.wasm")
+instantiate(bytes, importObject)
 .then(instance => instance.exports.e())
 \end{code}
 
@@ -553,8 +552,7 @@ fetch("simple.wasm")
 развијен од стране компаније \textit{Google}. Осим у оквиру њиховог пројекта \textit{Chromium}, који се користи као основа за многе веб прегледаче,
 међу којима је најпопуларнији \textit{Google Chrome}, \textit{V8} je саствни део и \textit{Node.js} пројекта. У поглављу \ref{chp:DEV} биће речи о развоју
 \textit{V8 JavaScript} мотора, док ће у поглављу \ref{chp:CHAR} бити представљене његове карактеристике. Оптимизујући компилатор \textit{TurboFan}
-биће приказан у поглављу \ref{chp:OPT}. У поглављима \ref{chp:V8MIPS} и \ref{chp:V8WASM} биће приказане подршка за \textit{MIPS} архитектуру процесора
-и за \textit{WebAssembly}.
+биће приказан у поглављу \ref{chp:OPT}. У поглављу \ref{chp:V8WASM} биће приказана подршка за \textit{WebAssembly} унутар \textit{V8}.
 
 \section{Развој} \label{chp:DEV}
 
@@ -681,9 +679,24 @@ fetch("simple.wasm")
 инструкција (енгл. \textit{Instruction Scheduling}). Веома често је, међу мноштвом потенцијалних распореда инструкција, тешко или немогуће изабрати прави. Стога се примена стриктнијег \textit{CFG}
 графа показала успешнијом у овој фази \cite{TFJIT}.
 
-\section{\textit{MIPS} подршка} \label{chp:V8MIPS}
-
 \section{\textit{WebAssembly} подршка} \label{chp:V8WASM}
+
+Као што је поменуто у секцији \ref{chp:SUPP}, сви водећи произвођачи веб прегледача избацили су прототип подршке за \textit{WebAssembly} у току 2016. године, а у току 2017.
+и прве званичне верзије са подршком. Такав је случај и са \textit{V8} мотором компаније \textit{Google}.
+
+Донета је одлука да се подршка у оквиру \textit{V8} мотора дода кроз \textit{TurboFan} оптимизујући компилатор. У потпуности је искоришћена структура и функционалност која се користи
+за \textit{JavaScript} код, једино је додат нови ниво енкапсулације за чворове изгенерисаног \textit{Sea-of-nodes} графа, како би се сачувале доданте информације неопходне за
+\textit{WebAssembly}.
+
+Овакав приступ је довео до тога да се уз минималан посао дође до потпуне подршке и потпуно функционалног компилатора. Ипак, оптимизације које пружа \textit{TurboFan}, осим погодности,
+донела је и један велики проблем: брзину превођења. Колико год код изгенерисан \textit{TurboFan} оптимизујућим компилатором био ефикасан, време потребно да тај код
+постане расположив представља огроман губитак, чиме се анулира предност која се добија у извршавању, поготову за код који се извршава само једном.
+
+%TODO: Dodaj primer vremena potrebnog za generisanje. Najbolje iskoristiti primer koji je koriscen i u WASM sekciji za Fact.
+
+Такве карактеристике указале су на потребу за неоптимизујућим компилатором. Улога неоптимизујућег компилатора би била да што брже изгенерише валидан код,
+а да се тек у наредним итерацијама, по потреби, позива \textit{TurboFan} који би пружио оптималан код и побољшање перформанси у току извршавања.
+Тако се, почетком 2018. почело са увођењем неоптимизујућег \textit{Liftoff} компилатора, са циљем да се комплетира подршка за \textit{WebAssembly}.
 
 \chapter{Имплементација}
 
